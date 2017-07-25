@@ -4,6 +4,14 @@
 #
 #
 
+__github__ = 'https://github.com/blue-sky-r/keyboard-test'
+
+__about__  = 'Keyboard Test Program'
+
+__version__ = '2017.7'
+
+__copyright__  = '(c) 2017 by Robert P'
+
 import sys
 import re
 import subprocess, os
@@ -12,79 +20,166 @@ import subprocess, os
 class Gui:
     """ GUI class using ANSI escape codes """
 
-    # http://ascii-table.com/ansi-escape-sequences.php
+    # http://wiki.bash-hackers.org/scripting/terminalcodes
     #
     ESC = '\033'
 
-    NORMAL  = '0'
-    BOLD    = '1'
-    BLINK   = '5'
-    INVERSE = '7'
+    # video attributes
+    ATTR = {
+        'reset':    '0',
+        'bold':     '1',
+        'dim':      '2',
+        'standout': '3',
+        'underline':'4',
+        'blink':    '5',
+        'inverse':  '7',
+        'hide':     '8'
+    }
 
-    def beep(self):
-        sys.stdout.write('\007')
+    # background
+    BG = {
+        'black':    '40',
+        'red':      '41',
+        'green':    '42',
+        'yellow':   '43',
+        'blue':     '44',
+        'magenta':  '45',
+        'cyan':     '46',
+        'white':    '47'
+    }
 
-    def print_esc(self, str):
-        s = '%s[%s' % (cls.ESC, str)
-        sys.stdout.write(s)
+    # foreground
+    FG = {
+        'black':    '30',
+        'red':      '31',
+        'green':    '32',
+        'yellow':   '33',
+        'blue':     '34',
+        'magenta':  '35',
+        'cyan':     '36',
+        'white':    '37'
+    }
+
+    header = '= %(about)s = version %(version)s = Press Key by Key until done = %(github)s = xinput %(xinputver)s = %(c)s ='
+
+    footer = '= Total Keys: %(total)3d = Tested: %(tested)3d = To go: %(togo)3d = Last Key: '
+
+    def __init__(self, xinputver):
+        data = {
+            'about'     : __about__,
+            'version'   : __version__,
+            'github'    : __github__,
+            'xinputver' : xinputver,
+            'c'         : __copyright__
+        }
+        self.header = self.header % data
+
+    def write(self, str):
+        sys.stdout.write(str)
+
+    def write_flush(self, str):
+        self.write(str)
         sys.stdout.flush()
 
-    def print_attr(self, attr):
-        s = ';'.join(attr) if type(attr) == 'list' else attr
-        self.print_esc(s+'m')
+    def beep(self):
+        self.write('\007')
 
-    def print_at(self, line, col):
-        str = '%d;%dH' % (line. col)
-        self.print_esc(str)
+    def write_esc(self, str):
+        s = '%s[%s' % (self.ESC, str)
+        self.write(s)
+
+    def write_attr(self, attr):
+        s = ';'.join(attr) if type(attr) == list else attr
+        self.write_esc(s + 'm')
+
+    def write_at(self, line1, col1):
+        str = '%d;%dH' % (line1, col1)
+        self.write_esc(str)
+
+    def home(self):
+        str = 'H'
+        self.write_esc(str)
+        self.atrow = 1
 
     def clear_screen(self):
-        self.row = 0
         str = '2J'
-        self.print_esc(str)
+        self.write_esc(str)
+        self.home()
 
     def move_up(self, n, str):
         s = '%d;%dH' % (n, str)
-        self.print_esc(s)
+        self.write_esc(s)
 
-    def vid_normal(self):
-        self.print_attr(self.NORMAL)
-
-    def vid_bold(self):
-        self.print_attr(self.BOLD)
-
-    def vid_blink(self):
-        self.print_attr(self.BLINK)
-
-    def vid_inverse(self):
-        self.print_attr(self.INVERSE)
-
-    def set_map(self, guimap):
-        self.guimap = guimap
+    def color(self, attr=None, fg=None, bg=None):
+        seq = []
+        for var,dct in zip([attr, fg, bg], [self.ATTR, self.FG, self.BG]):
+            if var is None: continue
+            a = dct.get(var)
+            if a: seq.append(a)
+        self.write_attr(seq)
 
     def print_(self, str):
-        self.row += 1
         print str,
 
-    def print_ln(self, str):
-        self.row += 1
+    def print_ln(self, str=''):
         print str
+        self.atrow += 1
 
-    def map(self):
-        self.print_ln
-        self.print_ln "Keyboard Test - press any key until all keys are tested"
-        self.print_ln
-        self.map0 = self.row
-        for line in self.guimap:
-            self.print_ line
+    def show_map(self, stats):
+        self.clear_screen()
+        self.show_header()
+        self.maprow = self.atrow-1
+        #
+        for line in self.map:
+            self.print_ln(line)
+        #
+        self.print_ln()
+        # footer = status line
+        self.statusrow = self.atrow
+        self.update_stats(stats)
+
+    def show_header(self):
+        self.print_ln(self.header)
+        self.print_ln()
+
+    def update_stats(self, data):
+        self.print_(self.footer % data)
 
     def key_action(self, keydict, action):
-        txt = keydict['key']
-        self.print_at(keydict['row']+self.map0, keydict['col'], txt)
+        if action == 'press':
+            self.color(fg='black', bg='red')
+        if action == 'release':
+            self.color(fg='black', bg='green')
+        row1,col1,txt = keydict['row']+1, keydict['col']+1, keydict['label']
+        self.write_at(row1+self.maprow, col1)
+        self.write_flush(txt)
+        #
+        self.color(attr='reset')
+        self.write_at(self.statusrow,1)
+
 
 class Xinput:
 
     def __init__(self):
         self.exe = 'xinput'
+
+    def version(self):
+        args = [self.exe, '--version']
+        try:
+            xinput = subprocess.Popen(args, stdout=subprocess.PIPE)
+            (stdout,stderr) = xinput.communicate()
+        except OSError as e:
+            return e.strerror
+        # stdout
+        for line in stdout.splitlines():
+            pat = 'xinput version '
+            if line.startswith(pat):
+                return line.replace(pat, '')
+        # stderr
+        for line in stderr.splitlines():
+            pass
+        # last line
+        return line
 
     def list(self):
         args = [self.exe, 'list']
@@ -92,27 +187,21 @@ class Xinput:
         (stdout,stderr) = xinput.communicate()
         return stdout
 
-    def open(self, num=8):
-        args = [self.exe, 'test', num]
+    def open(self, id='8'):
+        args = [self.exe, 'test', id]
         self.xinput = subprocess.Popen(args, stdout=subprocess.PIPE)
 
     def is_open(self):
         return self.xinput
 
     def close(self):
-        if self.xinput: self.xinput.terminate()
+        if self.xinput:
+            #self.xinput.stdout.readline()
+            self.xinput.terminate()
 
-    def get_line(self):
-        line = []
-        fd = self.xinput.stdout.fileno()
-        while True:
-            try:
-                c = os.read(fd, 1)
-            except:
-                continue
-            line.append(c)
-            if c == '\n': break
-        return ''.join(line)
+    def readline(self):
+        # return stdout
+        return self.xinput.stdout.readline()
 
 
 class Layout:
@@ -196,45 +285,76 @@ class Layout:
         # keycode -> (row,col), key, tested
         self.layout = {}
         self.xinput = Xinput()
-        self.gui = Gui()
+        self.gui = Gui(self.xinput.version())
+        self.stats = { 'total': 0, 'tested': 0, 'togo':0 }
 
     def load(self, fname):
+        map = []
         with open(fname) as f:
-            map = f.readlines()
+            for line in f:
+                map.append(line.rstrip(os.linesep))
         #
-        self.gui.set_map(map)
+        self.gui.map = map
         #
-        for row,line in enumerate(self.map):
+        for row,line in enumerate(map):
             if not line: continue
             self.parse_line(line, row)
+        # update stats total
+        self.stats['total'] = len(self.layout)
 
     def parse_line(self, line, row):
-        for m in re.finditer(r'\[\s+(\S+)\s+\]', line):
-            key,col = m.group(0), m.start(0)
-            self.add_key(key, row, col)
+        for m in re.finditer(r'\[(\s+(\S+)\s+)\]', line):
+            label,key,col = m.group(1),m.group(2),m.start(1)
+            self.add_key(key, row, col, label)
 
-    def add_key(self, key, row, col, tested=False):
+    def add_key(self, key, row, col, label, tested=False):
         keycode = self.key_to_keycode(key)
-        self.layout[keycode] = { 'row': row, 'col': col, 'key': key, 'tested': tested }
+        self.layout[keycode] = { 'row': row, 'col': col, 'key': key, 'label': label, 'tested': tested }
 
     def key_to_keycode(self, key):
-        return self.keycode.get(key, '?')
+        return self.rev_xmodmap.get(key, '?')
 
     def test(self):
+        # stats
+        self.update_stats()
+        self.gui.show_map(self.stats)
+        self.xinput.open()
+        ign1stkeycode = self.rev_xmodmap['RET']
         while not self.all_tested():
             action,keycode = self.keypress()
-            key = self.keycode_to_key(keycode)
-            self.gui_key_action(action, key)
+            keydict = self.keycode_to_key(keycode)
+            # ignore 1st keycode
+            if ign1stkeycode:
+                if ign1stkeycode == keycode:
+                    continue
+                ign1stkeycode = None
+            # gui feedback
+            self.gui.key_action(keydict, action)
+            # register
+            if action == 'press': keydict['tested'] = True
+            # stats
+            self.update_stats()
+            self.gui.update_stats(self.stats)
+        self.xinput.close()
+
+    def update_stats(self):
+        tested, togo = 0,0
+        for k, v in self.layout.items():
+            if v['tested']:
+                tested += 1
+            else:
+                togo += 1
+        self.stats['tested'] = tested
+        self.stats['togo'] = togo
 
     def all_tested(self):
-        return all([ l['tested'] for l in self.layout.items() ])
+        #return all([ v['tested'] for k,v in self.layout.items() ])
+        return self.stats['tested'] == self.stats['total']
 
     def keypress(self):
-        # start xinput if not running
-        if not self.xinput.is_open():
-            self.xinput.open()
         # wait for key
-        line = self.xinput.get_line()
+        line = self.xinput.readline()
+        #print 'keypress():line=',line
         m = re.search('key (press|release)\s+(\d+)', line)
         action  = m.group(1)
         keycode = m.group(2)
@@ -244,7 +364,10 @@ class Layout:
         return self.layout.get(keycode)
 
 
-l = Layout()
-l.load('apple.lay')
-l.gui_display()
-l.test()
+if __name__ == '__main__':
+    l = Layout()
+
+    # print l.xinput.list()
+
+    l.load('apple.lay')
+    l.test()
