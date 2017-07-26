@@ -1,6 +1,6 @@
 #!/bin/env python2
 
-# Simple Keyboard Test Program
+# Simple Keyboard Test Program - inspired by old DOS CheckIt / QA Plus
 #
 # - draws semi-graphics keyboard layout
 # - shows actually pressed key in red
@@ -17,7 +17,7 @@ __github__ = 'https://github.com/blue-sky-r/keyboard-test'
 
 __about__  = 'Keyboard Test Program'
 
-__version__ = '2017.7'
+__version__ = '2017.7.27'
 
 __copyright__  = '(c) 2017 by Robert P'
 
@@ -25,7 +25,8 @@ __copyright__  = '(c) 2017 by Robert P'
 import sys
 import re
 import subprocess, os
-import datetime
+import datetime, time
+import termios
 
 
 class Gui:
@@ -56,7 +57,8 @@ class Gui:
         'blue':     44,
         'magenta':  45,
         'cyan':     46,
-        'white':    47
+        'white':    47,
+        'reset':    49
     }
 
     # foreground
@@ -68,12 +70,13 @@ class Gui:
         'blue':     34,
         'magenta':  35,
         'cyan':     36,
-        'white':    37
+        'white':    37,
+        'reset':    39
     }
 
     header = '= %(about)s = version %(version)s = Press Key by Key until done = %(github)s = xinput %(xinputver)s = %(c)s ='
 
-    footer = '= Total Keys: %(total)3d = Tested: %(tested)3d = To go: %(togo)3d = Missing keycodes: %(missing)3d = Last Key: '
+    footer = '= Dev.id: %(devid)d [ %(devname)s ] = File: %(layout)s = Keys: %(total)3d = Tested: %(tested)3d = To go: %(togo)3d = Missing keycodes: %(missing)3d = Key: '
 
     def __init__(self, xinputver):
         """ update header template with configurable strings and xinput version """
@@ -86,6 +89,9 @@ class Gui:
         }
         self.header = self.header % data
 
+    def flush(self):
+        sys.stdout.flush()
+
     def write(self, str):
         """ write directly to stdout """
         sys.stdout.write(str)
@@ -93,11 +99,11 @@ class Gui:
     def write_flush(self, str):
         """ write directly to stdout and flush """
         self.write(str)
-        sys.stdout.flush()
+        self.flush()
 
     def beep(self):
         """ sound bell """
-        self.write('\007')
+        self.write_flush('\007')
 
     def write_esc(self, str):
         """ send ANSI escape sequence"""
@@ -127,7 +133,15 @@ class Gui:
         self.home()
 
     def clear_line(self):
-        str = 'K'
+        str = '2K'
+        self.write_esc(str)
+
+    def rclear_line(self):
+        str = '0K'
+        self.write_esc(str)
+
+    def lclear_line(self):
+        str = '1K'
         self.write_esc(str)
 
     def move_up(self, n=1):
@@ -143,6 +157,10 @@ class Gui:
             a = "%d" %  dct.get(var)
             if a: seq.append(a)
         self.write_attr(seq)
+
+    def color_reset(self):
+        """ reset attr, fg, bg """
+        self.color(attr='reset', fg='reset', bg='reset')
 
     def print_(self, str):
         """ print and stay on line """
@@ -177,6 +195,7 @@ class Gui:
 
     def update_stats(self, data):
         """ print/update status line = footer """
+        self.write_at(self.statusrow, 1)
         self.print_(self.footer % data)
 
     def key_action(self, keydict, action):
@@ -191,7 +210,8 @@ class Gui:
         # set position for unwanted xinput output to the ends of status line
         self.color(attr='reset')
         self.write_at(self.statusrow,1)
-        sys.stdout.flush()
+        self.rclear_line()
+        self.flush()
 
 
 class Xinput:
@@ -213,30 +233,36 @@ class Xinput:
             pat = 'xinput version '
             if line.startswith(pat):
                 return line.replace(pat, '')
-        # stderr
-        for line in stderr.splitlines():
-            pass
-        # last line
-        return line
+        #
+        return '?'
 
-    def list(self):
-        """ list xinput devices """
+    def list(self, filter='keyboard', trim=True):
+        """ list xinput devices with optional filter """
         args = [self.exe, 'list']
         xinput = subprocess.Popen(args, stdout=subprocess.PIPE)
         (stdout,stderr) = xinput.communicate()
-        return stdout
+        return [ line.strip() if trim else line for line in stdout.splitlines() if filter in line ]
 
-    def open(self, id='12'):
+    def name_by_id(self, id):
+        # get also ascii name for id (strip junk)
+        name = [ (dev.split('\t')[0]).strip('\xe2\x86\xb3 ') for dev in self.list() if "id=%d" % id in dev ]
+        return name[0] if name else '?'
+
+    def start(self, id=8):
         """ open xinput device id """
-        args = [self.exe, 'test', id]
-        self.xinput = subprocess.Popen(args, stdout=subprocess.PIPE)
+        args = [self.exe, 'test', "%d" % id]
+        try:
+            self.xinput = subprocess.Popen(args, stdout=subprocess.PIPE)
+        except OSError as e:
+            self.xinput = None
+            return "%s - %s" % (self.exe, e.strerror)
 
-    def is_open(self):
-        return self.xinput
+    def is_running(self):
+        return self.xinput and (self.xinput.poll() is None)
 
-    def close(self):
+    def stop(self):
         """ terminate xinput subprocess """
-        if self.xinput:
+        if self.is_running():
             #self.xinput.stdout.readline()
             self.xinput.terminate()
 
@@ -341,6 +367,7 @@ class Layout:
         'Katakana': 98,
         'Hiragana': 99,
         'Henkan_Mode': 100,
+        'XF86LaunchD': 101,
         'Muhenkan': 102,
         'ENT': 104,
         'RCTR': 105,
@@ -358,87 +385,283 @@ class Layout:
         'PGDN': 117,
         'INS': 118,
         'DEL': 119,
+        'XF86AudioMute': 121,
+        'XF86AudioLowerVolume': 122,
+        'XF86AudioRaiseVolume': 123,
+        'XF86PowerOff': 124,
         '_=': 125,
         'plus-': 126,
         'PAUS': 127,
+        'XF86LaunchA': 128,
         'KP_Decimal': 129,
         'Hangul': 130,
         'Hangul_Hanja': 131,
-        'Super_L': 133,
-        'Super_R': 134,
+        'XF86LightBulb': 132,
+        'LAPPLE': 133,
+        'RAPPLE': 134,
         'Menu': 135,
         'Cancel': 136,
         'Redo': 137,
         'SunProps': 138,
         'Undo': 139,
         'SunFront': 140,
+        'XF86Copy': 141,
+        'XF86Open': 142,
+        'XF86Paste': 143,
+        'XF86AudioPrev': 144,
+        'XF86Cut': 145,
         'Help': 146,
+        'XF86MenuKB': 147,
+        'XF86Calculator': 148,
+        'XF86Sleep': 150,
+        'XF86WakeUP': 151,
+        'XF86Explorer': 152,
+        'XF86AudioPGDN': 153,
+        'XF86Xfer': 155,
+        'XF86Launch1': 156,
+        'XF86Launch2': 157,
+        'XF86WWW': 158,
+        'XF86LaunchA': 159,
+        'XF86AudioMute': 160,
+        'XF86Calculator': 161,
+        'XF86AudioPAUS': 162,
+        'XF86Mail': 163,
+        'XF86AudioStop': 164,
+        'XF86Sleep': 165,
+        'XF86Back': 166,
+        'XF86Forward': 167,
+        'XF86Eject': 169,
+        'XF86Eject': 170,
+        'XF86AudioPGDN': 171,
+        'XF86AudioPlay': 172,
+        'XF86AudioPrev': 173,
+        'XF86AudioLowerVolume': 174,
+        'XF86AudioRecord': 175,
+        'XF86AudioRaiseVolume': 176,
+        'XF86Phone': 177,
+        'XF86WWW': 178,
+        'F13': 179,
+        'XF86HOMEPage': 180,
+        'XF86Reload': 181,
+        'XF86Close': 182,
+        'XF86ScrollUP': 185,
+        'XF86ScrollDOWN': 186,
         'parenleft': 187,
         'parenright': 188,
+        'XF86New': 189,
         'Redo': 190,
+        'F13': 191,
+        'F14': 192,
+        'F15': 193,
+        'XF86Launch7': 194,
+        'XF86Launch8': 195,
+        'XF86Launch9': 196,
+        'XF86AudioMicMute': 198,
+        'XF86TouchpadToggle': 199,
+        'XF86TouchpadOn': 200,
+        'XF86TouchpadOff': 201,
         'Mode_switch': 203,
+        'XF86Eject': 204,
+        'XF86LaunchC': 205,
+        'XF86AudioPlay': 208,
+        'XF86AudioPAUS': 209,
+        'XF86Launch3': 210,
+        'XF86Launch4': 211,
+        'XF86LaunchE': 212,
+        'XF86Suspend': 213,
+        'XF86Close': 214,
+        'XF86AudioPlay': 215,
+        'XF86AudioForward': 216,
+        'XF86WebCam': 220,
+        'XF86Standby': 223,
+        'XF86Messenger': 224,
+        'XF86Search': 225,
+        'XF86Go': 226,
+        'XF86Finance': 227,
+        'XF86Game': 228,
+        'XF86Search': 229,
+        'XF86Favorites': 230,
+        'XF86Refresh': 231,
+        'XF86Stop': 232,
+        'XF86Forward': 233,
+        'XF86Back': 234,
+        'XF86MyComputer': 235,
+        'XF86Mail': 236,
+        'XF86AudioMedia': 237,
+        'XF86KbdBrightnessUP': 238,
+        'XF86Send': 239,
+        'XF86Reply': 240,
+        'XF86LaunchB': 241,
+        'XF86Save': 242,
+        'XF86Documents': 243,
+        'XF86Battery': 244,
+        'XF86Launch0': 245,
+        'XF86WLAN': 246,
+        'HELP': 118,
     }
 
     def __init__(self):
         """ init required classes """
         # keycode -> (row,col), key, tested
         self.layout = {}
-        self.xinput = Xinput()
-        self.gui = Gui(self.xinput.version())
 
-    def load(self, fname):
+    def load_gmap(self, fname):
         """ load keyboard layout from fname map file and parse it (create layout dictionary) """
-        self.missingkeycodes = 0
-        map = []
+        gmap = []
         with open(fname) as f:
             for line in f:
-                map.append(line.rstrip(os.linesep))
-        # send map also to gui
-        self.gui.set_map(map)
-        # parse map
-        for row,line in enumerate(map):
-            if not line: continue
-            self.parse_line(line, row)
+                gmap.append(line.rstrip(os.linesep))
+        return gmap
 
-    def parse_line(self, line, row):
+    def parse_gmap(self, gmap):
+        errs = []
+        # parse map
+        for row,line in enumerate(gmap):
+            if not line: continue
+            errs += self._parse_line(line, row)
+        return errs
+
+    def _parse_line(self, line, row):
         """ extract all keys from single line of map layout """
+        errs = []
         for m in re.finditer(r'\[(\s+(\S+)\s+)\]', line):
             label,key,col = m.group(1),m.group(2),m.start(1)
-            self.add_key(key, row, col, label)
+            err = self._add_key(key, row, col, label)
+            if err: errs.append(err)
+        return errs
 
-    def add_key(self, key, row, col, label, tested=False):
+    def _add_key(self, key, row, col, label, tested=False):
         """ add single key to layout dictionary """
         # find keycode for key
         keycode = self.key_to_keycode(key)
-        if keycode:
-            # if found add to layout
-            self.layout[keycode] = { 'row': row, 'col': col, 'key': key, 'label': label, 'tested': tested }
-        else:
-            # if not found shows error message
-            self.missingkeycodes += 1
-            print "ERR: missing keycode for key [ %s ]" % key
+        if not keycode:
+            # if not found retrtns error message
+            return "missing keycode for key [ %s ]" % key
+        # if found add to layout
+        self.layout[keycode] = { 'row': row, 'col': col, 'key': key, 'label': label, 'tested': tested }
 
     def key_to_keycode(self, key):
         """ reverse xmodmap mapping lookup symbolic_key -> keycode """
         return self.rev_xmodmap.get(key)
 
-    def test(self):
-        """ main test loop"""
-        # optional pause if we have parsing errors
-        self.pause()
+    def keycode_to_key(self, keycode):
+        """ keycode entry from layout dictionary """
+        return self.layout.get(keycode)
+
+
+class Test:
+    """ test the keyboard key by key """
+
+    def __init__(self):
+        """ init required classes """
+        # keycode -> (row,col), key, tested
+        self.layout = Layout()
+        self.xinput = Xinput()
+        self.gui = Gui(self.xinput.version())
+
+    def find_1st(self, path='.', mask='.lay'):
+        for f in os.listdir(path):
+            if f.endswith(mask):
+                return f
+
+    def gmap_filename(self, gmapfname=None):
+        """ returns either specific gmap filename or the first from local dir """
+        # specified fname or the 1st in local dir
+        if gmapfname and len(gmapfname) and os.path.isfile(gmapfname):
+            return gmapfname
+        return self.find_1st()
+
+    def load_gmap(self, gmapfname):
+        """ load specified graphic map file """
+        # load graphical layout from file
+        gmap = self.layout.load_gmap(gmapfname)
+        # set to gui
+        self.gui.set_map(gmap)
+        # parse
+        err = self.layout.parse_gmap(gmap)
+        # store only count of missing keys
+        self.key_missing = len(err)
+        # show errors if any and wait for user confirmation
+        self.show_err(err)
+
+    def show_err(self, err):
+        """ optional pause only if we have missing keycodes so the user can see errors """
+        if len(err) == 0: return
+        for e in err:
+            print "ERR",e
+        print
+        _ = raw_input('Press ENTER to continue ...')
+
+    def dev_id(self, id=None):
+        """ returns either specific id or guide user with autodetection """
+        try:
+            int(id)
+        except TypeError as e:
+            id = self.autodetect_id()
+        return id
+
+    def autodetect_id(self):
+        """ checking changes in xinput list when connecting unknown kbd reveals its id """
+        print
+        self.gui.color(fg='black', bg='cyan')
+        print " = Autodetection of hot plugged keyboards ... = "
+        self.gui.color_reset()
+        print
+        print "Connect or Reconnect keyboard you want to test",
+        ref = self.xinput.list()
+        while True:
+            act = self.xinput.list()
+            # no change - loop again
+            if len(act) == len(ref):
+                self.gui.write_flush('.')
+                time.sleep(1)
+                continue
+            # something disconnected - take new reference nad loop again
+            if len(act) < len(ref):
+                removed = list(set(ref) - set(act))
+                print
+                print "Device disconnected:", ' / '.join(removed)
+                ref = act
+                continue
+            # something connected - find out id
+            if len(act) > len(ref):
+                added = list(set(act) - set(ref))
+                print
+                print "device connected   :", ' / '.join(added)
+                break
+        # extract minimal id = first of sorted list
+        # Mitsumi Electric Apple Extended USB Keyboard      id=8    [slave  keyboard (3)]
+        id = sorted([int(part.replace('id=', '')) for item in added for part in item.split() if part.startswith('id=')])[0]
+        return id
+
+    def pars_setup(self, gmapfname, id):
+        """ load gmap layout, open xinput dev.id """
+        # gmap file either specific or first in dir
+        self.gmapfname = self.gmap_filename(gmapfname)
+        # device id either specific or auto detected by user actions
+        self.devid = self.dev_id(id)
+        # dev name
+        self.devname = self.xinput.name_by_id(self.devid)
+
+    def test_setup(self):
+        # load gmap file and show errors if any
+        self.load_gmap(self.gmapfname)
+        # start xinput subprocess
+        err = self.xinput.start(self.devid)
         # draw gui layout map and stats
         self.gui.show_map()
         self.update_stats()
-        # start xinput subprocess
-        self.xinput.open()
+
+    def test_run(self):
+        """ main test loop"""
         # ignore the 1st RETURN key
-        ign1stkeycode = self.rev_xmodmap['RET']
+        ign1stkeycode = self.layout.key_to_keycode('RET')
         # loop until all is tested
-        while not self.all_tested():
+        while not self.all_tested() and self.xinput.is_running():
             # key event from xinput
             action,keycode = self.keypress()
             # get keydict struct from layout with coordinates, label, etc
-            keydict = self.keycode_to_key(keycode)
+            keydict = self.layout.keycode_to_key(keycode)
             # ignore unknown keys
             if not keydict: continue
             # ignore 1st keycode
@@ -450,37 +673,41 @@ class Layout:
                 ign1stkeycode = None
             # gui visual feedback
             self.gui.key_action(keydict, action)
-            # register key has been tested
-            if action == 'release': keydict['tested'] = True
+            # register key as tested
+            self.key_tested(action, keydict)
             # footer stats
             self.update_stats()
-        # end xinput subprocess
-        self.xinput.close()
-        # mini report
-        self.report()
-        #self.gui.clear_line()
+        #
+        self.test_teardown()
 
-    def pause(self):
-        """ optional pause only if we have missing keycodes so the user can see errors """
-        if self.missingkeycodes == 0: return
-        print
-        _ = raw_input('Press ENTER to continue ...')
+    def test_teardown(self):
+        # end xinput subprocess
+        self.xinput.stop()
+        # clear the xinput junk
+        termios.tcflush(sys.stdin, termios.TCIFLUSH)
+
+    def key_tested(self, action, keydict):
+        if action == 'release': keydict['tested'] = True
 
     def update_stats(self):
         """ update footer stats """
-        tested = len([ k for k,v in self.layout.items() if v['tested'] ])
-        total  = len(self.layout) + self.missingkeycodes
+        tested = len([ k for k,v in self.layout.layout.items() if v['tested'] ])
+        total  = len(self.layout.layout) + self.key_missing
         stats = {
             'total': total,
             'tested': tested,
-            'togo': total-tested,
-            'missing': self.missingkeycodes
+            'togo': total - tested - self.key_missing,
+            'missing': self.key_missing,
+            'devid': self.devid,
+            'devname': self.devname,
+            'layout': self.gmapfname
         }
         self.gui.update_stats(stats)
 
     def all_tested(self):
         """ are we doone = all keys has been tested """
-        return all([ v['tested'] for k,v in self.layout.items() ])
+        return len([1 for k, v in self.layout.layout.items() if v['tested']]) > 10
+        return all([ v['tested'] for k,v in self.layout.layout.items() ])
 
     def keypress(self):
         """ xinput key event press/release and keycode"""
@@ -488,25 +715,39 @@ class Layout:
         line = self.xinput.readline()
         # key press 128
         m = re.search('key (press|release)\s+(\d+)', line)
+        # return if not key press|release
+        if not m: return '',0
         action  = m.group(1)
         keycode = m.group(2)
         # return action (press/release0 and int keycode
         return action,int(keycode)
 
-    def keycode_to_key(self, keycode):
-        """ keycode entry from layout dictionary """
-        return self.layout.get(keycode)
-
     def report(self):
         """ mini report - right now only timestamp """
         print
         print
-        print "= TEST PASSED - all keys successfully tested @",datetime.datetime.now(),"="
+        if self.all_tested():
+            tested = len(self.layout.layout)
+            untested = self.key_missing
+            if untested == 0:
+                print "= TEST PASSED = All %d keys has been successfully tested @" % tested,
+            else:
+                total = tested+untested
+                print "= TEST WARNING = Only %d of %d [ %.1f%% ] keys has been successfully tested @" % (tested, total, 100.0*tested/total),
+        else:
+            print "= TEST FAILED @",
+        print datetime.datetime.now(),"="
         print
 
 
 if __name__ == '__main__':
 
-    l = Layout()
-    l.load('at101.lay')
-    l.test()
+    tst = Test()
+    tst.pars_setup('apple.lay', 8)
+    #
+    tst.test_setup()
+    tst.test_run()
+    tst.test_teardown()
+    #
+    tst.report()
+
