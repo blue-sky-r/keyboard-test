@@ -2,25 +2,51 @@
 
 # Simple Keyboard Test Program - inspired by old DOS CheckIt / QA Plus
 #
-# - draws semi-graphics keyboard layout
+# - draws ASCII-graphics keyboard layout
 # - shows actually pressed key in red
 # - all already tested keys shows in green
 #
-# Press key by key until entire keyboard is green = test passed
+# How to use: Press key by key until entire keyboard is green = test passed
 #
-# semi-graphical keyboard layout is editable in *.lay files
+# ASCII-graphical keyboard layout is editable in *.lay files (see provided files for details)
 #
-# Depends on xinput therefore it runs only on linux based systems !
+# Depends on xinput - therefore it runs only on linux Xorg based systems !
 #
 
 __github__ = 'https://github.com/blue-sky-r/keyboard-test'
 
 __about__  = 'Keyboard Test Program'
 
-__version__ = '2017.7.27'
+__version__ = '2017.7.28'
 
 __copyright__  = '(c) 2017 by Robert P'
 
+__usage__ = \
+"""
+Usage: kbd-tst.py [id] [layout] [-h|--help]
+       kbd-tst.py [-h|--help] [layout] [id]
+       
+    -h     ... shows this usage help and quits
+    --help ... shows this usage help and quits
+    id     ... optional keyboard device id as shown in 'xinput list' output (default user assisted autodetection)
+    layout ... optional keyboard ASCII layout file [*.lay] (default the first file in kbd-tst dir)
+    
+Notes: 
+    * parameters are optional
+    * not providing device id will initiate a user assisted autodetection sequence requiring physical disconneting 
+      and reconecting the keyboard under test (KUT)
+    * not providing the layout file is usefull if there is only single layout file in kbd-tst directory
+    * all unrecognized keys from layout file are shown as errors and counted as [ missing_keycodes ]
+    * all parameters can be supplied in arbitrary order
+    * in case of multiple specification the last one wins,
+      for example in sequence of parameters 'id1 layout1 layout2 id2' id2/layout2 pair wins
+    * test ends when all successfully recognized keys from layout file are tested [ to_go = 0 ]
+    * to end test prematurely just type phrase 'quit' (without the quotes)
+    
+Known issues:
+    - keys ike apple keyb VOL+/VOL-/MUTE/EJECT do not generate xinput events and therefore cannot be tested right now 
+    
+"""
 
 import sys
 import re
@@ -76,7 +102,7 @@ class Gui:
 
     header = '= %(about)s = version %(version)s = Press Key by Key until done = %(github)s = xinput %(xinputver)s = %(c)s ='
 
-    footer = '= Dev.id: %(devid)d [ %(devname)s ] = File: %(layout)s = Keys: %(total)3d = Tested: %(tested)3d = To go: %(togo)3d = Missing keycodes: %(missing)3d = Key: '
+    footer = '= dev.id: %(devid)d [ %(devname)s ] = file: %(layout)s = Keys: %(total)3d = Tested: %(tested)3d = To go: %(togo)3d = Missing keycodes: %(missing)3d = Key: '
 
     def __init__(self, xinputver):
         """ update header template with configurable strings and xinput version """
@@ -161,6 +187,7 @@ class Gui:
     def color_reset(self):
         """ reset attr, fg, bg """
         self.color(attr='reset', fg='reset', bg='reset')
+        self.flush()
 
     def print_(self, str):
         """ print and stay on line """
@@ -212,6 +239,18 @@ class Gui:
         self.write_at(self.statusrow,1)
         self.rclear_line()
         self.flush()
+
+    def banner(self, txt, bg='cyan', above=1, bellow=1):
+        for i in range(above):
+            print
+        #
+        self.color(fg='black', bg=bg)
+        print txt
+        self.color_reset()
+        self.flush()
+        #
+        for i in range(bellow):
+            print
 
 
 class Xinput:
@@ -560,6 +599,7 @@ class Test:
         self.gui = Gui(self.xinput.version())
 
     def find_1st(self, path='.', mask='.lay'):
+        """ find the 1st file matching mask in directory path """
         for f in os.listdir(path):
             if f.endswith(mask):
                 return f
@@ -573,6 +613,7 @@ class Test:
 
     def load_gmap(self, gmapfname):
         """ load specified graphic map file """
+        self.gui.banner(" = Loading keyboard layout file: %s = " % gmapfname)
         # load graphical layout from file
         gmap = self.layout.load_gmap(gmapfname)
         # set to gui
@@ -588,7 +629,11 @@ class Test:
         """ optional pause only if we have missing keycodes so the user can see errors """
         if len(err) == 0: return
         for e in err:
-            print "ERR",e
+            self.gui.banner(" ERR: %s " % e, bg='red', above=0, bellow=0)
+        print
+        print "This is caused either by:"
+        print "\t - problems in layout file: %s (incorrect [ key_labels ] etc )" % self.gmapfname
+        print "\t - missing dictionary entries in rev_xmodmap = {...} ( Layout class )"
         print
         _ = raw_input('Press ENTER to continue ...')
 
@@ -602,12 +647,8 @@ class Test:
 
     def autodetect_id(self):
         """ checking changes in xinput list when connecting unknown kbd reveals its id """
-        print
-        self.gui.color(fg='black', bg='cyan')
-        print " = Autodetection of hot plugged keyboards ... = "
-        self.gui.color_reset()
-        print
-        print "Connect or Reconnect keyboard you want to test",
+        self.gui.banner(" = Autodetection process started ... = ")
+        print "Connect or Reconnect keyboard you want to test ",
         ref = self.xinput.list()
         while True:
             act = self.xinput.list()
@@ -627,11 +668,13 @@ class Test:
             if len(act) > len(ref):
                 added = list(set(act) - set(ref))
                 print
-                print "device connected   :", ' / '.join(added)
+                print "Device connected   :", ' / '.join(added)
                 break
         # extract minimal id = first of sorted list
         # Mitsumi Electric Apple Extended USB Keyboard      id=8    [slave  keyboard (3)]
         id = sorted([int(part.replace('id=', '')) for item in added for part in item.split() if part.startswith('id=')])[0]
+        self.gui.banner(" = Autodetection done = detected device id:%d [ %s ] = " % (id, self.xinput.name_by_id(id)))
+        time.sleep(1)
         return id
 
     def pars_setup(self, gmapfname, id):
@@ -644,6 +687,7 @@ class Test:
         self.devname = self.xinput.name_by_id(self.devid)
 
     def test_setup(self):
+        """ process prerequisites - load layout file, start xinput process """
         # load gmap file and show errors if any
         self.load_gmap(self.gmapfname)
         # start xinput subprocess
@@ -655,7 +699,9 @@ class Test:
     def test_run(self):
         """ main test loop"""
         # ignore the 1st RETURN key
-        ign1stkeycode = self.layout.key_to_keycode('RET')
+        self.ignore_1st(ignorekey='RET')
+        # setup quit phrase
+        self.quit(phrase='quit')
         # loop until all is tested
         while not self.all_tested() and self.xinput.is_running():
             # key event from xinput
@@ -665,12 +711,9 @@ class Test:
             # ignore unknown keys
             if not keydict: continue
             # ignore 1st keycode
-            if ign1stkeycode:
-                # just loop if key is ignored
-                if ign1stkeycode == keycode:
-                    continue
-                # stop ignoring
-                ign1stkeycode = None
+            if self.ignore_1st(keycode=keycode): continue
+            # detect quit phrase
+            if self.quit(key=keydict['key']): break
             # gui visual feedback
             self.gui.key_action(keydict, action)
             # register key as tested
@@ -680,13 +723,43 @@ class Test:
         #
         self.test_teardown()
 
+    def ignore_1st(self, ignorekey=None, keycode=None):
+        """ setup and evaluate ignoring the first key (usually ENTER) """
+        # has keycode = evaluate mode
+        if keycode:
+            # do not ignore if no ignore keycode is stored
+            if not self.ikeycode: return False
+            # ignore only ignore keycode
+            if keycode == self.ikeycode: return True
+            # other than ignore keycode disable ignoring
+            self.ikeycode = None
+            return False
+        # setup mode - store ignore keycode
+        self.ikeycode = self.layout.key_to_keycode(ignorekey)
+
+    def quit(self, key=None, phrase=None):
+        """ setup and detect phrase sequence """
+        # setup quit phrase
+        if phrase:
+            self.phrase = phrase
+            self.lastkeys = [chr(31)] * len(phrase)
+            return
+        # detect
+        # ignore diplicate keys
+        if key == self.lastkeys[len(self.lastkeys)-1]: return False
+        self.lastkeys.append(key)
+        self.lastkeys.pop(0)
+        self.gui.write_at(20,0)
+        return ''.join(self.lastkeys) == self.phrase
+
     def test_teardown(self):
         # end xinput subprocess
         self.xinput.stop()
-        # clear the xinput junk
+        # clear the xinput junk from stdin
         termios.tcflush(sys.stdin, termios.TCIFLUSH)
 
     def key_tested(self, action, keydict):
+        """ mark key as tested """
         if action == 'release': keydict['tested'] = True
 
     def update_stats(self):
@@ -706,7 +779,6 @@ class Test:
 
     def all_tested(self):
         """ are we doone = all keys has been tested """
-        return len([1 for k, v in self.layout.layout.items() if v['tested']]) > 10
         return all([ v['tested'] for k,v in self.layout.layout.items() ])
 
     def keypress(self):
@@ -724,26 +796,43 @@ class Test:
 
     def report(self):
         """ mini report - right now only timestamp """
-        print
-        print
+        now = datetime.datetime.now()
+        tested = len([k for k, v in self.layout.layout.items() if v['tested']])
+        total = len(self.layout.layout) + self.key_missing
+        untested = total - tested
         if self.all_tested():
-            tested = len(self.layout.layout)
-            untested = self.key_missing
             if untested == 0:
-                print "= TEST PASSED = All %d keys has been successfully tested @" % tested,
+                self.gui.banner(" = TEST PASSED = All %d keys has been successfully tested @ %s = " % (tested, now), \
+                                bg='green', above=2, bellow=1)
             else:
-                total = tested+untested
-                print "= TEST WARNING = Only %d of %d [ %.1f%% ] keys has been successfully tested @" % (tested, total, 100.0*tested/total),
+                self.gui.banner(" = TEST WARNING = Only %d of %d [ %.1f%% ] keys has been successfully tested @ %s = " \
+                                % (tested, total, 100.0*tested/total, now), bg='yellow', above=2, bellow=1)
         else:
-            print "= TEST FAILED @",
-        print datetime.datetime.now(),"="
-        print
+            self.gui.banner(" = TEST FAILED = Only %d of %d [ %.1f%% ] keys has been successfully tested @ %s = " \
+                            % (tested, total, 100.0*tested/total, now), bg='red', above=2, bellow=1)
+
+
+def parse_argv(argv):
+    """ process parameters in arbitrary order """
+    id, layout = None, None
+    for par in argv:
+        if par in ['-h', '--help']:
+            print "=",__about__,"version",__version__,"=",__copyright__,"="
+            print __usage__
+            sys.exit()
+        if par.isdigit():
+            id = int(par)
+        else:
+            layout = par
+    return id, layout
 
 
 if __name__ == '__main__':
 
     tst = Test()
-    tst.pars_setup('apple.lay', 8)
+    #
+    id, layout = parse_argv(sys.argv[1:])
+    tst.pars_setup(layout, id)
     #
     tst.test_setup()
     tst.test_run()
