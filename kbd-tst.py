@@ -1,4 +1,4 @@
-#!/bin/env python2
+#!/usr/bin/env python2
 
 # Simple Keyboard Test Program - inspired by old DOS CheckIt / QA Plus
 #
@@ -45,6 +45,9 @@ Notes:
     
 Known issues:
     - keys ike apple keyb VOL+/VOL-/MUTE/EJECT do not generate xinput events and therefore cannot be tested right now 
+    - if more than one device id is found by autodetection sequence only the first one is used, which is some cases
+      might be incorrect. In this case provide the correct device id as a parameter (id can be found by trial and error
+      from 'xinput list' and verified by 'xinput test id' to show 'key press xx' and 'key release xx' events) 
     
 """
 
