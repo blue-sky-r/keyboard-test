@@ -48,6 +48,7 @@ Known issues:
     - if more than one device id is found by autodetection sequence only the first one is used, which is some cases
       might be incorrect. In this case provide the correct device id as a parameter (id can be found by trial and error
       from 'xinput list' and verified by 'xinput test id' to show 'key press xx' and 'key release xx' events) 
+      [ xinput double entries related bug: https://bugs.launchpad.net/ubuntu/+source/hal/+bug/277946 ]
     
 """
 
@@ -550,9 +551,10 @@ class Layout:
     def load_gmap(self, fname):
         """ load keyboard layout from fname map file and parse it (create layout dictionary) """
         gmap = []
-        with open(fname) as f:
-            for line in f:
-                gmap.append(line.rstrip(os.linesep))
+        if fname:
+            with open(fname) as f:
+                for line in f:
+                    gmap.append(line.rstrip(os.linesep))
         return gmap
 
     def parse_gmap(self, gmap):
@@ -715,14 +717,14 @@ class Test:
             if not keydict: continue
             # ignore 1st keycode
             if self.ignore_1st(keycode=keycode): continue
-            # detect quit phrase
-            if self.quit(key=keydict['key']): break
             # gui visual feedback
             self.gui.key_action(keydict, action)
             # register key as tested
             self.key_tested(action, keydict)
             # footer stats
             self.update_stats()
+            # detect quit phrase
+            if self.quit(key=keydict['key']): break
         #
         self.test_teardown()
 
@@ -790,7 +792,7 @@ class Test:
         line = self.xinput.readline()
         # key press 128
         m = re.search('key (press|release)\s+(\d+)', line)
-        # return if not key press|release
+        # this should not happen: return if not key press|release
         if not m: return '',0
         action  = m.group(1)
         keycode = m.group(2)
@@ -812,7 +814,7 @@ class Test:
                                 % (tested, total, 100.0*tested/total, now), bg='yellow', above=2, bellow=1)
         else:
             self.gui.banner(" = TEST FAILED = Only %d of %d [ %.1f%% ] keys has been successfully tested @ %s = " \
-                            % (tested, total, 100.0*tested/total, now), bg='red', above=2, bellow=1)
+                        % (tested, total, 100.0*tested/total, now), bg='red', above=2, bellow=1)
 
 
 def parse_argv(argv):
