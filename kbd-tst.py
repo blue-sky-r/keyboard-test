@@ -17,7 +17,7 @@ __github__ = 'https://github.com/blue-sky-r/keyboard-test'
 
 __about__  = 'Keyboard Test Program'
 
-__version__ = '2017.7.28'
+__version__ = '2017.7.30'
 
 __copyright__  = '(c) 2017 by Robert P'
 
@@ -28,12 +28,12 @@ Usage: kbd-tst.py [id] [layout] [-h|--help]
        
     -h     ... shows this usage help and quits
     --help ... shows this usage help and quits
-    id     ... optional keyboard device id as shown in 'xinput list' output (default user assisted autodetection)
+    id     ... optional keyboard xinput id as shown in 'xinput list' output (default user assisted autodetection)
     layout ... optional keyboard ASCII layout file [*.lay] (default the first file in kbd-tst dir)
     
 Notes: 
     * parameters are optional
-    * not providing device id will initiate a user assisted autodetection sequence requiring physical disconneting 
+    * not providing xinput id will initiate a user assisted autodetection sequence requiring physical disconneting 
       and reconecting the keyboard under test (KUT)
     * not providing the layout file is usefull if there is only single layout file in kbd-tst directory
     * all unrecognized keys from layout file are shown as errors and counted as [ missing_keycodes ]
@@ -45,9 +45,9 @@ Notes:
     
 Known issues:
     - keys ike apple keyb VOL+/VOL-/MUTE/EJECT do not generate xinput events and therefore cannot be tested right now 
-    - if more than one device id is found by autodetection sequence only the first one is used, which is some cases
-      might be incorrect. In this case provide the correct device id as a parameter (id can be found by trial and error
-      from 'xinput list' and verified by 'xinput test id' to show 'key press xx' and 'key release xx' events) 
+    - if more than one xinput id is found by autodetection sequence only the first one is used, which is some cases
+      might be incorrect. In this case provide the correct xinput id as a parameter (id can be found by trial and error
+      from 'xinput list' and verified by 'xinput test id' to check 'key press xx' and 'key release xx' events) 
       [ xinput double entries related bug: https://bugs.launchpad.net/ubuntu/+source/hal/+bug/277946 ]
     
 """
@@ -106,7 +106,7 @@ class Gui:
 
     header = '= %(about)s = version %(version)s = Press Key by Key until done = %(github)s = xinput %(xinputver)s = %(c)s ='
 
-    footer = '= dev.id: %(devid)d [ %(devname)s ] = file: %(layout)s = Keys: %(total)3d = Tested: %(tested)3d = To go: %(togo)3d = Missing keycodes: %(missing)3d = Key: '
+    footer = '= x.id: %(id)d [ %(devname)s ] = File: %(layout)s = Keys: %(total)3d = Tested: %(tested)3d = To go: %(togo)3d = Missing keycodes: %(missing)3d ='
 
     def __init__(self, xinputver):
         """ update header template with configurable strings and xinput version """
@@ -163,14 +163,17 @@ class Gui:
         self.home()
 
     def clear_line(self):
+        """ clear entire line """
         str = '2K'
         self.write_esc(str)
 
     def rclear_line(self):
+        """ clear line right from cursor """
         str = '0K'
         self.write_esc(str)
 
     def lclear_line(self):
+        """ clear line left from cursor """
         str = '1K'
         self.write_esc(str)
 
@@ -192,6 +195,14 @@ class Gui:
         """ reset attr, fg, bg """
         self.color(attr='reset', fg='reset', bg='reset')
         self.flush()
+
+    def cursor_off(self):
+        """ no cursor is shown """
+        self.write_esc('?25l')
+
+    def cursor_on(self):
+        """ show cursor """
+        self.write_esc('?25h')
 
     def print_(self, str):
         """ print and stay on line """
@@ -238,11 +249,8 @@ class Gui:
         row1,col1,txt = keydict['row']+1, keydict['col']+1, keydict['label']
         self.write_at(row1+self.maprow, col1)
         self.write_flush(txt)
-        # set position for unwanted xinput output to the ends of status line
+        # reset color back to normal
         self.color(attr='reset')
-        self.write_at(self.statusrow,1)
-        self.rclear_line()
-        self.flush()
 
     def banner(self, txt, bg='cyan', above=1, bellow=1):
         for i in range(above):
@@ -256,6 +264,9 @@ class Gui:
         for i in range(bellow):
             print
 
+    def dbg(self, txt):
+        self.write_at(25,1)
+        print txt
 
 class Xinput:
     """ executing xinput as subprocess """
@@ -642,8 +653,8 @@ class Test:
         print
         _ = raw_input('Press ENTER to continue ...')
 
-    def dev_id(self, id=None):
-        """ returns either specific id or guide user with autodetection """
+    def kut_id(self, id=None):
+        """ returns either specific keyboard unde test id or guide user with autodetection """
         try:
             int(id)
         except TypeError as e:
@@ -678,7 +689,7 @@ class Test:
         # extract minimal id = first of sorted list
         # Mitsumi Electric Apple Extended USB Keyboard      id=8    [slave  keyboard (3)]
         id = sorted([int(part.replace('id=', '')) for item in added for part in item.split() if part.startswith('id=')])[0]
-        self.gui.banner(" = Autodetection done = detected device id:%d [ %s ] = " % (id, self.xinput.name_by_id(id)))
+        self.gui.banner(" = Autodetection done = detected xinput id:%d [ %s ] = " % (id, self.xinput.name_by_id(id)))
         time.sleep(1)
         return id
 
@@ -687,19 +698,32 @@ class Test:
         # gmap file either specific or first in dir
         self.gmapfname = self.gmap_filename(gmapfname)
         # device id either specific or auto detected by user actions
-        self.devid = self.dev_id(id)
+        self.id = self.kut_id(id)
         # dev name
-        self.devname = self.xinput.name_by_id(self.devid)
+        self.devname = self.xinput.name_by_id(self.id)
 
     def test_setup(self):
         """ process prerequisites - load layout file, start xinput process """
         # load gmap file and show errors if any
         self.load_gmap(self.gmapfname)
+        # terminal
+        self.terminal_setup()
         # start xinput subprocess
-        err = self.xinput.start(self.devid)
+        err = self.xinput.start(self.id)
         # draw gui layout map and stats
         self.gui.show_map()
         self.update_stats()
+
+    def terminal_setup(self):
+        """ setup terminal """
+        # termios - no echo
+        self.stdinfd = sys.stdin.fileno()
+        self.saveattr = termios.tcgetattr(self.stdinfd)
+        noecho = self.saveattr[:]
+        noecho[3] = noecho[3] & ~termios.ECHO
+        termios.tcsetattr(self.stdinfd, termios.TCSADRAIN, noecho)
+        # switch off cursor
+        self.gui.cursor_off()
 
     def test_run(self):
         """ main test loop"""
@@ -750,7 +774,7 @@ class Test:
             self.lastkeys = [chr(31)] * len(phrase)
             return
         # detect
-        # ignore diplicate keys
+        # ignore duplicate keys
         if key == self.lastkeys[len(self.lastkeys)-1]: return False
         self.lastkeys.append(key)
         self.lastkeys.pop(0)
@@ -760,8 +784,17 @@ class Test:
     def test_teardown(self):
         # end xinput subprocess
         self.xinput.stop()
+        # terminal back to normal
+        self.terminal_reset()
+
+    def terminal_reset(self):
+        """ reset terminal back to normal """
+        # saved attributes back
+        termios.tcsetattr(self.stdinfd, termios.TCSADRAIN, self.saveattr)
+        # activate cursor back on
+        self.gui.cursor_on()
         # clear the xinput junk from stdin
-        termios.tcflush(sys.stdin, termios.TCIFLUSH)
+        termios.tcflush(self.stdinfd, termios.TCIFLUSH)
 
     def key_tested(self, action, keydict):
         """ mark key as tested """
@@ -776,7 +809,7 @@ class Test:
             'tested': tested,
             'togo': total - tested - self.key_missing,
             'missing': self.key_missing,
-            'devid': self.devid,
+            'id': self.id,
             'devname': self.devname,
             'layout': self.gmapfname
         }
