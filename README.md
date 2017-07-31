@@ -73,21 +73,21 @@ The testing procedure simply consists of the steps:
 - repeat until all keys are tested (recognized by kbd-tst)
 - check result status (single line)
 
-### device id
-Due to dymanic nature and hot-lugging support of device ids we have to find the correct device id of KUT (keyboatd under test) 
+### xinput id
+Due to dymanic nature and hot-plugging support of xinput ids we have to find the correct device id of KUT (keyboatd under test) 
 This is the most important and in some cases also the most difficult part of the testing procedure.
 
-There is built-in user assisted autodetection modality. This requires connecting the KUT (keyboaard under test) if KUT 
-is not connected yet. If KUT i already connected, reconnect is required. The autodetection section is watching system while
-KUT is connected and then can identify device id automatically. However, in some cases, two devices are created by HAL,
-which makes it impossible for autodetect to choose. Then the first one is selected by autodetection. If this is not correct
-you have to provide device id manually as parameter:
+Fortunatelly there is built-in user assisted autodetection modality. This requires connecting the KUT (keyboaard under test) if KUT 
+is not connected yet. If KUT is already connected, reconnect is required. The autodetection function is watching system while
+KUT is connected and then it can identify xinput id automatically. However, in some cases, two devices are created by HAL,
+which makes it impossible for autodetect to choose. Then the first one is selected by autodetection. If this is not yhe correct
+one you have to provide xinput id manually as parameter:
 
     > kbd-tst.py 12
     
 ### layout file
 Layout file is simple ASCII art visual representation of physical keyboard layout. Each key is represented by square brackets
-with key label inside wrapped by spaces, for example: key number one is represented as [ 1 ] which visualy looks like key.
+with key label inside wrapped by spaces, for example: a key with the number one is represented as [ 1 ] which visualy looks like a key.
 This file is loaded, parsed (parsing errors are shown if any) and then also used for visual on screen feedback. Check provided
 layout files for details (apple.lay, at101.lay)
 
@@ -95,16 +95,31 @@ Name of required layout file to be loaded has to be specified as parameter:
 
     > kbd-tst.py at101.lay
     
-If there is no layout file parameter privided, the first layout file in directory is taken. This is usefull if there is only
+If there is no layout file parameter provided, the first layout file in the directory is taken. This is usefull if there is only
 single file in the directory. 
 
 Feel free to contribute your own specific layout files into layouts directory ...
+
+![xinput id autodetection and missing keycode in rev_xmodmap](https://github.com/blue-sky-r/keyboard-test/blob/master/screenshots/autodetection-layour_err.png)
+
+### report
+At the end of test the single line report is generated:
+- test passed (green) ... all keys have been successfully tested
+- test warning (yellow/orange) ... all testable keys have been tested but we have some missing keycodes 
+- test failed ... not all keys tested, premature exit from test (by typing quit)
+
+![apple test ended with warning](https://github.com/blue-sky-r/keyboard-test/blob/master/screenshots/apple-warning.png)
 
 ### Files
 The follwoing files:
 - kbd-tst.py ... is keyboard test python executable file
 - apple.lay, at101.lay ... are layout files used by kbd-tst
 - rev_xmodmap.sh ... is shell script to build reverse xmodmap dictionary (in case of future maintenance and improvements)
+- screenshots/1-2-3-4.gif ... animated gif pf testing four keys 1-2-3-4
+- screenshots/1-2-3-4.mp4 ... screencats pf testing four keys 1-2-3-4
+- screenshots/apple-warning.mp4 ... screencats pf testing apple mitsumi keyboard ended with warning (4 keycodes are missing)
+- screenshots/apple-warning.png ... screenshot ot the result of test above
+- screenshots/autodetection-layout_err.png ... screenshot ot the result of xinput autodetection and four errors from layout file loader
 
 Hope it helps ...
 
