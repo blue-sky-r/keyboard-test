@@ -10,6 +10,8 @@ There is a way to test keyboard without any such utility like this one just by u
 you have to remember which keys have been tested and do not miss any untested ones. And everything is easier with visual 
 feedback displayed live on screen with kbd-test.
 
+[[https://github.com/blue-sky-r/keyboard-test/blob/master/screenshots/1-2-3-4.gif]]
+
 ### Typical usage scenarios
 Here are few typical ones:
 - buying new keyboard
