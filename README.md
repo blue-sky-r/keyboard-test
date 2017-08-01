@@ -1,7 +1,7 @@
 # What is kbd-tst
 kbd-tst.py is a simple keyboard test program. It tests functionality of all keys providing graphical (well, only ASCII
 semigraphics in text terminal) feedback to the user like already tested keys are green, currently pressed keys are 
-red and untested keys are white. 
+red and untested keys are white (see animated gif bellow). 
  
 ### Objective
 Simple and user friendly keyboard test without external dependencies using only standard system utilities ...
@@ -80,8 +80,8 @@ This is the most important and in some cases also the most difficult part of the
 Fortunatelly there is built-in user assisted autodetection modality. This requires connecting the KUT (keyboaard under test) if KUT 
 is not connected yet. If KUT is already connected, reconnect is required. The autodetection function is watching system while
 KUT is connected and then it can identify xinput id automatically. However, in some cases, two devices are created by HAL,
-which makes it impossible for autodetect to choose. Then the first one is selected by autodetection. If this is not yhe correct
-one you have to provide xinput id manually as parameter:
+which makes it impossible for autodetect to choose. Then the first one is selected by autodetection. If this is not the correct
+one you have to provide xinput id manually as a command line parameter:
 
     > kbd-tst.py 12
     
@@ -98,15 +98,20 @@ Name of required layout file to be loaded has to be specified as parameter:
 If there is no layout file parameter provided, the first layout file in the directory is taken. This is usefull if there is only
 single file in the directory. 
 
+The button legend in layout file has to be translatable by rev_xmodmap dictionary in Layout class. This allows to use shorter
+button labels to rpoperly design ASCII keyboard layout. If button label from layout file has no entry in rev_xmodmap dictionary
+the error message is show. The test will continue, but there will be no way to test all keys. Therefore such execution will
+end with (yellow/orange) warning (see screenshots bellow with warnings on layout load and test report).
+
 Feel free to contribute your own specific layout files into layouts directory ...
 
 ![xinput id autodetection and missing keycode in rev_xmodmap](https://github.com/blue-sky-r/keyboard-test/blob/master/screenshots/autodetection-layour_err.png)
 
 ### report
-At the end of test the single line report is generated:
+At the end of test the single line report with summary is generated:
 - test passed (green) ... all keys have been successfully tested
 - test warning (yellow/orange) ... all testable keys have been tested but we have some missing keycodes 
-- test failed ... not all keys tested, premature exit from test (by typing quit)
+- test failed ... not all keys has been tested (premature exit from test by typing quit, CTRL-C, etc ...)
 
 ![apple test ended with warning](https://github.com/blue-sky-r/keyboard-test/blob/master/screenshots/apple-warning.png)
 
@@ -117,8 +122,8 @@ The follwoing files:
 - rev_xmodmap.sh ... is shell script to build reverse xmodmap dictionary (in case of future maintenance and improvements)
 - screenshots/1-2-3-4.gif ... animated gif pf testing four keys 1-2-3-4
 - screenshots/1-2-3-4.mp4 ... screencats pf testing four keys 1-2-3-4
-- screenshots/apple-warning.mp4 ... screencats pf testing apple mitsumi keyboard ended with warning (4 keycodes are missing)
-- screenshots/apple-warning.png ... screenshot ot the result of test above
+- screenshots/apple-warning.mp4 ... screencats of testing apple mitsumi keyboard ended with warning (4 keycodes are missing)
+- screenshots/apple-warning.png ... screenshot of the result from abote 
 - screenshots/autodetection-layout_err.png ... screenshot ot the result of xinput autodetection and four errors from layout file loader
 
 Hope it helps ...
