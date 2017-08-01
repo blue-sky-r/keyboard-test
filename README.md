@@ -120,11 +120,11 @@ The follwoing files:
 - kbd-tst.py ... is keyboard test python executable file
 - apple.lay, at101.lay ... are layout files used by kbd-tst
 - rev_xmodmap.sh ... is shell script to build reverse xmodmap dictionary (in case of future maintenance and improvements)
-- screenshots/1-2-3-4.gif ... animated gif pf testing four keys 1-2-3-4
-- screenshots/1-2-3-4.mp4 ... screencats pf testing four keys 1-2-3-4
+- screenshots/1-2-3-4.gif ... animated gif of testing four keys 1-2-3-4
+- screenshots/1-2-3-4.mp4 ... screencats of testing four keys 1-2-3-4
 - screenshots/apple-warning.mp4 ... screencats of testing apple mitsumi keyboard ended with warning (4 keycodes are missing)
 - screenshots/apple-warning.png ... screenshot of the result from abote 
-- screenshots/autodetection-layout_err.png ... screenshot ot the result of xinput autodetection and four errors from layout file loader
+- screenshots/autodetection-layout_err.png ... screenshot of the result of xinput autodetection and four errors from layout file loader
 
 Hope it helps ...
 
