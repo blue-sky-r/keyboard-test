@@ -1,14 +1,16 @@
-# What is kbd-tst
+# What is kbd-tst (keyboard-test)
 kbd-tst.py is a simple keyboard test program. It tests functionality of all keys providing graphical (well, only ASCII
-semigraphics in text terminal) feedback to the user like already tested keys are green, currently pressed keys are 
-red and untested keys are white (see animated gif bellow). 
+semigraphics in text terminal) feedback to the user like:
+- already tested keys are green
+- currently pressed keys are red
+- untested keys are white (see animated gif bellow). 
  
 ### Objective
-Simple and user friendly keyboard test without external dependencies using only standard system utilities ...
+Simple and user friendly keyboard test without external dependencies ()using only standard system utilities) ...
 
 There is a way to test keyboard without any such utility like this one just by using text editor for example. In this case
 you have to remember which keys have been tested and do not miss any untested ones. And everything is easier with visual 
-feedback displayed live on screen with kbd-test.
+feedback displayed live on the screen with kbd-test.
 
 ![1-2-3-4 keys tested](https://github.com/blue-sky-r/keyboard-test/blob/master/screenshots/1-2-3-4.gif)
 
@@ -16,14 +18,14 @@ feedback displayed live on screen with kbd-test.
 Here are few typical ones:
 - buying new keyboard
 - cleaning/repairing/modding existing keyboard
-- non standard keyboard connections like protocol/level converters, drivers, ...
+- non standard keyboard connections like protocol converters, level shifters, drivers, ...
 
 ### Dependencies
 Despite minimalistic implementation there are following requirements:
 - python 2.x
 - xinput
 
-_Note: Due to xinput dependency the kbd-tst can run only on linux-like sytems with Xorg_
+_Note: Due to xinput dependency the kbd-tst can run only on linux-like systems with Xorg_
 
 ### Internals
 Entire kbd-tst implementation is 'xinput test' centered. Xinput is executed as a subprocess and output events are
@@ -71,7 +73,7 @@ The testing procedure simply consists of the steps:
 - execute kbd-tst.py with some optional parameters (see bellow)
 - pressing each untested key at least once (shown white on visual layout, pressing the key changes its color to red/green)
 - repeat until all keys are tested (recognized by kbd-tst)
-- check result status (single line)
+- check result status (single line report)
 
 ### xinput id
 Due to dymanic nature and hot-plugging support of xinput ids we have to find the correct device id of KUT (keyboatd under test) 
