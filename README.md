@@ -119,8 +119,9 @@ At the end of test the single line report with summary is generated:
 
 ### Files
 The follwoing files:
-- kbd-tst.py ... is keyboard test python executable file
-- apple.lay, at101.lay ... are layout files used by kbd-tst
+- kbd-tst.py ... main keyboard test python executable file
+- at101.lay ... standard default AT 101 keyboard layout file
+- layouts/*.lay ... are optional layout files for kbd-tst
 - rev_xmodmap.sh ... is shell script to build reverse xmodmap dictionary (in case of future maintenance and improvements)
 - screenshots/1-2-3-4.gif ... animated gif of testing four keys 1-2-3-4
 - screenshots/1-2-3-4.mp4 ... screencats of testing four keys 1-2-3-4
