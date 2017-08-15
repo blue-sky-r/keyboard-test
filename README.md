@@ -89,8 +89,8 @@ one you have to provide xinput id manually as a command line parameter:
     
 ### layout file
 Layout file is simple ASCII art visual representation of physical keyboard layout. Each key is represented by square brackets
-with key label inside wrapped by spaces, for example: a key with the number one is represented as [ 1 ] which visualy looks like a key.
-This file is loaded, parsed (parsing errors are shown if any) and then also used for visual on screen feedback. Check provided
+with key label inside wrapped by spaces, for example: a key with the number one is represented as [ 1 ] which visualy looks like a keycap.
+This layout file is loaded, parsed (parsing errors are shown if any) and then also used for visual on screen feedback. Check provided
 layout files for details (apple.lay, at101.lay)
 
 Name of required layout file to be loaded has to be specified as parameter:
@@ -113,9 +113,13 @@ Feel free to contribute your own specific layout files into layouts directory ..
 At the end of test the single line report with summary is generated:
 - test passed (green) ... all keys have been successfully tested
 - test warning (yellow/orange) ... all testable keys have been tested but we have some missing keycodes 
-- test failed ... not all keys has been tested (premature exit from test by typing quit, CTRL-C, etc ...)
+- test failed ... not all keys has been tested (premature exit from test by typing "q" "u" "i" "t", CTRL-C, etc ...)
 
 ![apple test ended with warning](https://github.com/blue-sky-r/keyboard-test/blob/master/screenshots/apple-warning.png)
+
+### known issues
+- hitting [ Print Screen ] key actually also launches KSnapshot in KDE/TDE 
+- hitting [ Scroll Lock  ] key toggles xinput events so it has to be hit twice 
 
 ### Files
 The follwoing files:
