@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/python3
 
 # Simple Keyboard Test Program - inspired by old DOS CheckIt / QA Plus
 #
@@ -206,11 +206,11 @@ class Gui:
 
     def print_(self, str):
         """ print and stay on line """
-        print str,
+        print(str, end=' ')
 
     def print_ln(self, str=''):
         """ print with newline """
-        print str
+        print(str)
         self.atrow += 1
 
     def set_map(self, map):
@@ -254,19 +254,19 @@ class Gui:
 
     def banner(self, txt, bg='cyan', above=1, bellow=1):
         for i in range(above):
-            print
+            print()
         #
         self.color(fg='black', bg=bg)
-        print txt
+        print(txt)
         self.color_reset()
         self.flush()
         #
         for i in range(bellow):
-            print
+            print()
 
     def dbg(self, txt):
         self.write_at(25,1)
-        print txt
+        print(txt)
 
 class Xinput:
     """ executing xinput as subprocess """
@@ -285,12 +285,12 @@ class Xinput:
         # stdout
         for line in stdout.splitlines():
             pat = 'xinput version '
-            if line.startswith(pat):
-                return line.replace(pat, '')
+            if line.startswith(pat.encode()):
+                return line.replace(pat.encode(), ''.encode())
         #
         return '?'
 
-    def list(self, filter='keyboard', trim=True):
+    def list(self, filter='keyboard'.encode(), trim=True):
         """ list xinput devices with optional filter """
         args = [self.exe, 'list']
         xinput = subprocess.Popen(args, stdout=subprocess.PIPE)
@@ -299,7 +299,7 @@ class Xinput:
 
     def name_by_id(self, id):
         # get also ascii name for id (strip junk)
-        name = [ (dev.split('\t')[0]).strip('\xe2\x86\xb3 ') for dev in self.list() if "id=%d" % id in dev ]
+        name = [ dev.decode().strip() for dev in self.list() if "id="+str(id) in dev.decode() ]
         return name[0] if name else '?'
 
     def start(self, id=8):
@@ -646,12 +646,10 @@ class Test:
         if len(err) == 0: return
         for e in err:
             self.gui.banner(" ERR: %s " % e, bg='red', above=0, bellow=0)
-        print
-        print "This is caused either by:"
-        print "\t - problems in layout file: %s (incorrect [ key_labels ] etc )" % self.gmapfname
-        print "\t - missing dictionary entries in rev_xmodmap = {...} ( Layout class )"
-        print
-        _ = raw_input('Press ENTER to continue ...')
+        print("This is caused either by:")
+        print("\t - problems in layout file: %s (incorrect [ key_labels ] etc )" % self.gmapfname)
+        print("\t - missing dictionary entries in rev_xmodmap = {...} ( Layout class )")
+        _ = input('Press ENTER to continue ...')
 
     def kut_id(self, id=None):
         """ returns either specific keyboard unde test id or guide user with autodetection """
@@ -664,7 +662,7 @@ class Test:
     def autodetect_id(self):
         """ checking changes in xinput list when connecting unknown kbd reveals its id """
         self.gui.banner(" = Autodetection process started ... = ")
-        print "Connect or Reconnect keyboard you want to test ",
+        print("Connect or Reconnect keyboard you want to test ", end=' ')
         ref = self.xinput.list()
         while True:
             act = self.xinput.list()
@@ -676,19 +674,19 @@ class Test:
             # something disconnected - take new reference nad loop again
             if len(act) < len(ref):
                 removed = list(set(ref) - set(act))
-                print
-                print "Device disconnected:", ' / '.join(removed)
+                removed_str = list(map(lambda x: x.decode(), removed))
+                print("Device disconnected:", ' / '.join(removed_str))
                 ref = act
                 continue
             # something connected - find out id
             if len(act) > len(ref):
                 added = list(set(act) - set(ref))
-                print
-                print "Device connected   :", ' / '.join(added)
+                added_str = list(map(lambda x: x.decode(), added))
+                print("Device connected   :", ' / '.join(added_str))
                 break
         # extract minimal id = first of sorted list
         # Mitsumi Electric Apple Extended USB Keyboard      id=8    [slave  keyboard (3)]
-        id = sorted([int(part.replace('id=', '')) for item in added for part in item.split() if part.startswith('id=')])[0]
+        id = sorted([int(part.replace('id='.encode(), ''.encode())) for item in added for part in item.split() if part.startswith('id='.encode())])[0]
         self.gui.banner(" = Autodetection done = detected xinput id:%d [ %s ] = " % (id, self.xinput.name_by_id(id)))
         time.sleep(1)
         return id
@@ -802,7 +800,7 @@ class Test:
 
     def update_stats(self):
         """ update footer stats """
-        tested = len([ k for k,v in self.layout.layout.items() if v['tested'] ])
+        tested = len([ k for k,v in list(self.layout.layout.items()) if v['tested'] ])
         total  = len(self.layout.layout) + self.key_missing
         stats = {
             'total': total,
@@ -817,14 +815,14 @@ class Test:
 
     def all_tested(self):
         """ are we doone = all keys has been tested """
-        return all([ v['tested'] for k,v in self.layout.layout.items() ])
+        return all([ v['tested'] for k,v in list(self.layout.layout.items()) ])
 
     def keypress(self):
         """ xinput key event press/release and keycode"""
         # wait for key
         line = self.xinput.readline()
         # key press 128
-        m = re.search('key (press|release)\s+(\d+)', line)
+        m = re.search('key (press|release)\s+(\d+)', line.decode())
         # this should not happen: return if not key press|release
         if not m: return '',0
         action  = m.group(1)
@@ -835,7 +833,7 @@ class Test:
     def report(self):
         """ mini report - right now only timestamp """
         now = datetime.datetime.now()
-        tested = len([k for k, v in self.layout.layout.items() if v['tested']])
+        tested = len([k for k, v in list(self.layout.layout.items()) if v['tested']])
         total = len(self.layout.layout) + self.key_missing
         untested = total - tested
         if self.all_tested():
@@ -855,8 +853,8 @@ def parse_argv(argv):
     id, layout = None, None
     for par in argv:
         if par in ['-h', '--help']:
-            print "=",__about__,"version",__version__,"=",__copyright__,"="
-            print __usage__
+            print("=",__about__,"version",__version__,"=",__copyright__,"=")
+            print(__usage__)
             sys.exit()
         if par.isdigit():
             id = int(par)
