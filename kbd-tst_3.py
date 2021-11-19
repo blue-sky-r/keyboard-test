@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/python3
 
 # Simple Keyboard Test Program - inspired by old DOS CheckIt / QA Plus
 #
@@ -299,7 +299,7 @@ class Xinput:
 
     def name_by_id(self, id):
         # get also ascii name for id (strip junk)
-        name = [ dev.decode().trim() for dev in self.list() if "id="+str(id) in dev ]
+        name = [ dev.decode().strip() for dev in self.list() if "id="+str(id) in dev.decode() ]
         return name[0] if name else '?'
 
     def start(self, id=8):
@@ -822,7 +822,7 @@ class Test:
         # wait for key
         line = self.xinput.readline()
         # key press 128
-        m = re.search('key (press|release)\s+(\d+)', line)
+        m = re.search('key (press|release)\s+(\d+)', line.decode())
         # this should not happen: return if not key press|release
         if not m: return '',0
         action  = m.group(1)
